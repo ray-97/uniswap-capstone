@@ -8,9 +8,10 @@ use stylus_sdk::{
     prelude::entrypoint,
     stylus_proc::{public, sol_storage, SolidityError},
 };
-
 use alloy_primitives::{Address, U256};
 use alloy_sol_types::sol;
+
+mod logic;
 
 /// The currency data type.
 pub type Currency = Address;

@@ -10,9 +10,10 @@ import {BalanceDelta} from "v4-core/types/BalanceDelta.sol";
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary, toBeforeSwapDelta} from "v4-core/types/BeforeSwapDelta.sol";
 import {Currency, CurrencyLibrary} from "v4-core/types/Currency.sol";
 import {SafeCast} from "v4-core/libraries/SafeCast.sol";
+import {TickMath} from "v4-core/libraries/TickMath.sol";
 
 // Make sure to update the interface when Stylus Contract's Solidity ABI changes.
-interface IUniswapCurve {
+interface IStylusDiamond {
     function getAmountInForExactOutput(uint256 amountOut, address input, address output, bool zeroForOne)
         external
         returns (uint256);
@@ -22,41 +23,64 @@ interface IUniswapCurve {
         returns (uint256);
 }
 
-contract Counter is BaseHook {
+contract DiamondHook is BaseHook {
     using PoolIdLibrary for PoolKey;
     using CurrencyLibrary for Currency;
     using SafeCast for uint256;
+    using TickMath for int24;
 
-    // NOTE: ---------------------------------------------------------
-    // state variables should typically be unique to a pool
-    // a single hook contract should be able to service multiple pools
-    // ---------------------------------------------------------------
+    uint24 internal constant _PIPS = 1000000;
+    int24 public immutable lowerTick;
+    int24 public immutable upperTick;
+    int24 public immutable tickSpacing;
+    uint24 public immutable baseBeta; // % expressed as uint < 1e6
+    uint24 public immutable decayRate; // % expressed as uint < 1e6
+    uint24 public immutable vaultRedepositRate; // % expressed as uint < 1e6
 
-    mapping(PoolId => uint256 count) public beforeSwapCount;
-    mapping(PoolId => uint256 count) public afterSwapCount;
+    struct PoolManagerCallData {
+        uint256 amount; /// mintAmount | burnAmount | newSqrtPriceX96 (inferred from actionType)
+        address msgSender;
+        address receiver;
+        uint8 actionType; /// 0 = mint | 1 = burn | 2 = arbSwap
+    }
 
-    mapping(PoolId => uint256 count) public beforeAddLiquidityCount;
-    mapping(PoolId => uint256 count) public beforeRemoveLiquidityCount;
+    IStylusDiamond _stylusDiamondContract;
 
-    IUniswapCurve _curveContract;
-
-    constructor(IPoolManager _poolManager, address _curveContractAddress) BaseHook(_poolManager) {
-        _curveContract = IUniswapCurve(_curveContractAddress);
+    constructor(
+        IPoolManager _poolManager,
+        address _stylusDiamondContractAddress,
+        int24 _tickSpacing,
+        uint24 _baseBeta,
+        uint24 _decayRate,
+        uint24 _vaultRedepositRate
+        ) BaseHook(_poolManager) {
+        _stylusDiamondContract = IStylusDiamond(_stylusDiamondContractAddress);
+        lowerTick = _tickSpacing.minUsableTick();
+        upperTick = _tickSpacing.maxUsableTick();
+        tickSpacing = _tickSpacing;
+        require(
+            _baseBeta < _PIPS &&
+            _decayRate <= _baseBeta &&
+            _vaultRedepositRate < _PIPS  
+        );
+        baseBeta = _baseBeta;
+        decayRate = _decayRate;
+        vaultRedepositRate = _vaultRedepositRate;
     }
 
     function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
         return Hooks.Permissions({
-            beforeInitialize: false,
+            beforeInitialize: true,
             afterInitialize: false,
             beforeAddLiquidity: true,
             afterAddLiquidity: false,
             beforeRemoveLiquidity: true,
             afterRemoveLiquidity: false,
-            beforeSwap: true, // -- Custom Curve Handler --  //
+            beforeSwap: true,
             afterSwap: true,
             beforeDonate: false,
             afterDonate: false,
-            beforeSwapReturnDelta: false, // -- Enable Custom Curves here if needed --  //
+            beforeSwapReturnDelta: false,
             afterSwapReturnDelta: false,
             afterAddLiquidityReturnDelta: false,
             afterRemoveLiquidityReturnDelta: false
@@ -66,6 +90,8 @@ contract Counter is BaseHook {
     // -----------------------------------------------
     // NOTE: see IHooks.sol for function documentation
     // -----------------------------------------------
+
+
 
     function beforeSwap(address, PoolKey calldata key, IPoolManager.SwapParams calldata params, bytes calldata)
         external
@@ -84,21 +110,20 @@ contract Counter is BaseHook {
         BeforeSwapDelta returnDelta;
 
         if (exactInput) {
-            unspecifiedAmount = _curveContract.getAmountOutFromExactInput(
+            unspecifiedAmount = _stylusDiamondContract.getAmountOutFromExactInput(
                 specifiedAmount, Currency.unwrap(specified), Currency.unwrap(unspecified), params.zeroForOne
             );
 
             returnDelta = toBeforeSwapDelta(specifiedAmount.toInt128(), -unspecifiedAmount.toInt128());
         } else {
-            unspecifiedAmount = _curveContract.getAmountInForExactOutput(
+            unspecifiedAmount = _stylusDiamondContract.getAmountInForExactOutput(
                 specifiedAmount, Currency.unwrap(unspecified), Currency.unwrap(specified), params.zeroForOne
             );
 
             returnDelta = toBeforeSwapDelta(-specifiedAmount.toInt128(), unspecifiedAmount.toInt128());
         }
 
-        beforeSwapCount[key.toId()]++;
-        return (BaseHook.beforeSwap.selector, returnDelta, 0);
+        
     }
 
     function afterSwap(address, PoolKey calldata key, IPoolManager.SwapParams calldata, BalanceDelta, bytes calldata)
@@ -106,8 +131,6 @@ contract Counter is BaseHook {
         override
         returns (bytes4, int128)
     {
-        afterSwapCount[key.toId()]++;
-        return (BaseHook.afterSwap.selector, 0);
     }
 
     function beforeAddLiquidity(
@@ -116,8 +139,7 @@ contract Counter is BaseHook {
         IPoolManager.ModifyLiquidityParams calldata,
         bytes calldata
     ) external override returns (bytes4) {
-        beforeAddLiquidityCount[key.toId()]++;
-        return BaseHook.beforeAddLiquidity.selector;
+        
     }
 
     function beforeRemoveLiquidity(
@@ -126,7 +148,5 @@ contract Counter is BaseHook {
         IPoolManager.ModifyLiquidityParams calldata,
         bytes calldata
     ) external override returns (bytes4) {
-        beforeRemoveLiquidityCount[key.toId()]++;
-        return BaseHook.beforeRemoveLiquidity.selector;
     }
 }

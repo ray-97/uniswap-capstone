@@ -1,4 +1,4 @@
-common dev commands
+Common dev commands
 ===================
 ```
 
@@ -39,3 +39,8 @@ debug errors: https://github.com/OffchainLabs/cargo-stylus/blob/main/main/VALID_
 ref:
 https://ethresear.ch/t/lvr-minimization-in-uniswap-v4/15900
 https://fenbushi.vc/2024/01/20/ending-lps-losing-game-exploring-the-loss-versus-rebalancing-lvr-problem-and-its-solutions/
+
+
+
+Logic of hook
+==============================================================================
