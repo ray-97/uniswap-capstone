@@ -39,8 +39,12 @@ debug errors: https://github.com/OffchainLabs/cargo-stylus/blob/main/main/VALID_
 ref:
 https://ethresear.ch/t/lvr-minimization-in-uniswap-v4/15900
 https://fenbushi.vc/2024/01/20/ending-lps-losing-game-exploring-the-loss-versus-rebalancing-lvr-problem-and-its-solutions/
+https://github.com/ArrakisFinance/minimize-lvr-hook-poc
 
 
-
-Logic of hook
+Extensions / What's different
 ==============================================================================
+1. code updated to use more recent uniswap libs. code that is mainly using uniswap lib remains in foundry project
+2. shifted some compute to stylus
+3. black scholes model in stylus for analytics of loss etc
+4. more detailed explaination of code and logic for purpose of learning and sharing
