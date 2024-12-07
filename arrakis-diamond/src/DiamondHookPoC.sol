@@ -24,6 +24,19 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {BaseFactory} from "./BaseFactory.sol";
 
+interface IAnalytics {
+        function feedLvrData(uint256 price, uint256 volatility, uint256 marginalLiq)
+            external returns (uint256);
+
+        function getLvr() external view returns (uint256);
+
+        function feedFees(uint256 fees) external;
+
+        function getFees() external view returns (uint256);
+
+        function setAsset(address asset0, address asset1) external;
+    }
+
 contract DiamondHookPoC is BaseHook, ERC20, IERC1155Receiver, ReentrancyGuard {
     using PoolIdLibrary for PoolKey;
     using CurrencyLibrary for Currency;
@@ -94,13 +107,17 @@ contract DiamondHookPoC is BaseHook, ERC20, IERC1155Receiver, ReentrancyGuard {
         uint24 betaFactor;
     }
 
+    IAnalytics _analytics;
+
     constructor(
         IPoolManager _poolManager,
         int24 _tickSpacing,
         uint24 _baseBeta,
         uint24 _decayRate,
-        uint24 _vaultRedepositRate
+        uint24 _vaultRedepositRate,
+        address _extContract
     ) BaseHook(_poolManager) ERC20("Diamond LP Token", "DLPT") {
+        _analytics = IAnalytics(_extContract);
         lowerTick = _tickSpacing.minUsableTick();
         upperTick = _tickSpacing.maxUsableTick();
         tickSpacing = _tickSpacing;

@@ -1,0 +1,38 @@
+[package]
+name = "lvr-compute"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+alloy-primitives = "=0.7.6"
+alloy-sol-types = "=0.7.6"
+mini-alloc = "0.4.2"
+stylus-sdk = { version = "0.6.0", features = ["debug"] }
+hex = "0.4.3"
+rust_decimal = { version = "1.35.0", features = ["maths"] }
+rust_decimal_macros = "1.34.2"
+
+[dev-dependencies]
+motsu = "0.2.0"
+tokio = { version = "1.12.0", features = ["full"] }
+ethers = "2.0"
+eyre = "0.6.8"
+
+[features]
+export-abi = ["stylus-sdk/export-abi"]
+debug = ["stylus-sdk/debug"]
+std = []
+
+[[bin]]
+name = "lvr-compute"
+path = "src/main.rs"
+
+[lib]
+crate-type = ["lib", "cdylib"]
+
+[profile.release]
+codegen-units = 1
+strip = true
+lto = true
+panic = "abort"
+opt-level = "s"
