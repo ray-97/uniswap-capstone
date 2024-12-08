@@ -24,18 +24,11 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {BaseFactory} from "./BaseFactory.sol";
 
-interface IAnalytics {
-        function feedLvrData(uint256 price, uint256 volatility, uint256 marginalLiq)
-            external returns (uint256);
+interface ICompute {
+    function computeLvr(uint256 volatility, uint256 marginal_liq) external view returns (uint256);
 
-        function getLvr() external view returns (uint256);
-
-        function feedFees(uint256 fees) external;
-
-        function getFees() external view returns (uint256);
-
-        function setAsset(address asset0, address asset1) external;
-    }
+    error CurveCustomError();
+}
 
 contract DiamondHookPoC is BaseHook, ERC20, IERC1155Receiver, ReentrancyGuard {
     using PoolIdLibrary for PoolKey;
@@ -80,6 +73,7 @@ contract DiamondHookPoC is BaseHook, ERC20, IERC1155Receiver, ReentrancyGuard {
     uint256 internal _a1;
     /// ----------
 
+    uint256 public lvrAccumulated; // todo: low impact re-adding etc
     uint256 public lastBlockOpened;
     uint256 public lastBlockReset;
     uint256 public hedgeRequired0;
@@ -107,7 +101,7 @@ contract DiamondHookPoC is BaseHook, ERC20, IERC1155Receiver, ReentrancyGuard {
         uint24 betaFactor;
     }
 
-    IAnalytics _analytics;
+    ICompute _compute;
 
     constructor(
         IPoolManager _poolManager,
@@ -117,7 +111,8 @@ contract DiamondHookPoC is BaseHook, ERC20, IERC1155Receiver, ReentrancyGuard {
         uint24 _vaultRedepositRate,
         address _extContract
     ) BaseHook(_poolManager) ERC20("Diamond LP Token", "DLPT") {
-        _analytics = IAnalytics(_extContract);
+        _compute = ICompute(_extContract);
+        lvrAccumulated = 0;
         lowerTick = _tickSpacing.minUsableTick();
         upperTick = _tickSpacing.maxUsableTick();
         tickSpacing = _tickSpacing;
@@ -545,6 +540,7 @@ contract DiamondHookPoC is BaseHook, ERC20, IERC1155Receiver, ReentrancyGuard {
 
                 /// transfer swapOutAmt to arber
                 poolManager.take(poolKey.currency1, pmCalldata.receiver, swap1);
+                lvrAccumulated += _compute.computeLvr((sqrtPriceX96Virtual - newSqrtPriceX96), swap0);
             } else {
                 /// transfer swapInAmt to PoolManager
 
@@ -558,6 +554,7 @@ contract DiamondHookPoC is BaseHook, ERC20, IERC1155Receiver, ReentrancyGuard {
                 poolManager.settle(poolKey.currency1);
                 /// transfer swapOutAmt to arber
                 poolManager.take(poolKey.currency0, pmCalldata.receiver, swap0);
+                lvrAccumulated += _compute.computeLvr((newSqrtPriceX96 - sqrtPriceX96Virtual), swap1);
             }
         }
 

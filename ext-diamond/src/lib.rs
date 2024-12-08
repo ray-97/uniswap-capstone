@@ -3,98 +3,86 @@
 extern crate alloc;
 
 /// Import items from the SDK. The prelude contains common traits and macros.
-// use stylus_sdk::{alloy_primitives::U256, prelude::*};
-// use alloy_primitives::Address;
+use stylus_sdk::{
+    prelude::entrypoint,
+    stylus_proc::{public, sol_storage, SolidityError},
+};
 
-use rust_decimal::prelude::*;
-use rust_decimal_macros::dec;
-use stylus_sdk::{alloy_primitives::U256, console, prelude::*};
-use alloy_primitives::Address;
+use alloy_primitives::{U160, U256};
+use alloy_sol_types::sol;
 
-#[storage]
-#[entrypoint]
-struct LVRCompute {
-    risky_asset: Address, // address of the risky asset, aka x
-    numeraire: Address, // address of the numeraire
-    trades: U256, // number of trades to date
-    price: U256, // last seen asset price
-    volatility: U256, // last computed price volatility
-    marginal_liq: U256, // last computed marginal liquidity, how much x moves when price moves
-    lvrt: U256, // last computed LVR time
-    lvr: U256, // accumulated LVR to date
-    fees: U256, // fees collected to date
+sol! {
+    /// Indicates a custom error.
+    #[derive(Debug)]
+    #[allow(missing_docs)]
+    error CurveCustomError();
+}
+
+#[derive(SolidityError, Debug)]
+pub enum Error {
+    /// Indicates a custom error.
+    CustomError(CurveCustomError),
+}
+
+sol_storage! {
+    #[entrypoint]
+    struct Compute { }
+}
+
+/// Interface of an [`Compute`] contract.
+///
+/// NOTE: The contract's interface can be modified in any way.
+pub trait IAnalytics {
+    fn compute_lvr(
+        &self,
+        volatility: U256,
+        marginal_liq: U256,
+    ) -> Result<U256, Error>;
+}
+
+/// Declare that [`Compute`] is a contract
+/// with the following external methods.
+#[public]
+impl IAnalytics for Compute {
+    fn compute_lvr(
+        &self,
+        volatility: U256, // change in price
+        marginal_liq: U256, // % change in liquidity of risky asset
+    ) -> Result<U256, Error> {
+        let volatility = volatility.to::<U256>();
+        let volatility_sq = mul_div(volatility, volatility, U256::from(1))?;
+        let variance = mul_div(volatility_sq, U256::from(1), U256::from(2))?;
+        let lvr = mul_div(variance, marginal_liq, U256::from(1))?;
+        Ok(lvr)
+  }
 }
 
 
-pub trait Analytics {
-    fn feed_lvr_data(&mut self, price: U256, volatility: U256, marginal_liq: U256) -> U256;
+// source for helper: https://github.com/OpenZeppelin/uniswap-stylus-curve-template/blob/main/src/lib.rs
 
-    fn get_lvr(&self) -> U256;
+/// Returns `a * b / c` and if the result had carry.
+pub fn _mul_div(a: U256, b: U256, mut denom_and_rem: U256) -> Result<(U256, bool), Error> {
+  if denom_and_rem == U256::ZERO {
+      return Err(Error::CustomError(CurveCustomError{}));
+  }
 
-    fn feed_fees(&mut self, fees: U256) -> ();
+  let mut mul_and_quo = a.widening_mul::<256, 4, 512, 8>(b);
 
-    fn get_fees(&self) -> U256;
+  unsafe {
+      ruint::algorithms::div(mul_and_quo.as_limbs_mut(), denom_and_rem.as_limbs_mut());
+  }
 
-    fn set_asset(&mut self, risky_asset: Address, numeraire: Address) -> ();
+  let limbs = mul_and_quo.into_limbs();
+  if limbs[4..] != [0_u64; 4] {
+    return Err(Error::CustomError(CurveCustomError{}));
+  }
+
+  let has_carry = denom_and_rem != U256::ZERO;
+
+  Ok((U256::from_limbs_slice(&limbs[0..4]), has_carry))
 }
 
-impl LVRCompute {
-    pub fn new(risky_asset: Address, numeraire: Address) -> Self {
-        Self {
-            risky_asset,
-            numeraire,
-            trades: U256::from(0),
-            price: U256::from(0),
-            volatility: U256::from(0),
-            marginal_liq: U256::from(0),
-            lvrt: U256::from(0),
-            lvr: U256::from(0),
-            fees: U256::from(0),
-        }
-    }
+/// Returns `a * b / c`, rounding down.
+pub fn mul_div(a: U256, b: U256, denom: U256) -> Result<U256, Error> {
+  Ok(_mul_div(a, b, denom)?.0)
 }
-
-fn compute_lvr(
-    volatilty: U256,
-    price: U256,
-    marginal_liq: U256,
-) -> U256 {
-    let volatility_dec = Decimal::from(volatilty);
-    let price_dec = Decimal::from(price);
-    let marginal_liq_dec = Decimal::from(marginal_liq);
-    let variance = volatility_dec * volatility_dec * price_dec * price_dec / Decimal::TWO;
-    let lvr = variance * marginal_liq_dec;
-    lvr
-}
-
-impl Analytics for LVRCompute {
-    fn feed_lvr_data(&mut self, price: U256, volatility: U256, marginal_liq: U256) -> U256 {
-        let lvr = compute_lvr(volatility, price, marginal_liq);
-        self.price = price;
-        self.volatility = volatility;
-        self.marginal_liq = marginal_liq;
-        self.lvr = self.lvr + lvr;
-        self.trades = self.trades + U256::from(1);
-        self.lvrt = lvr;
-        lvr
-    }
-
-    fn feed_fees(&mut self, fees: U256) {
-        self.fees = self.fees + fees;
-    }
-
-    fn get_fees(&self) -> U256 {
-        self.fees
-    }
-
-    fn get_lvr(&self) -> U256 {
-        self.lvr
-    }
-
-    fn set_asset(&mut self, risky_asset: Address, numeraire: Address) {
-        self.risky_asset = risky_asset;
-        self.numeraire = numeraire;
-    }
-    
-}
-

@@ -2207,6 +2207,7 @@ dependencies = [
  "hex",
  "mini-alloc 0.4.2",
  "motsu",
+ "ruint",
  "rust_decimal",
  "rust_decimal_macros",
  "stylus-sdk",

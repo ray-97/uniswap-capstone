@@ -11,6 +11,7 @@ stylus-sdk = { version = "0.6.0", features = ["debug"] }
 hex = "0.4.3"
 rust_decimal = { version = "1.35.0", features = ["maths"] }
 rust_decimal_macros = "1.34.2"
+ruint = "1.12.3"
 
 [dev-dependencies]
 motsu = "0.2.0"
