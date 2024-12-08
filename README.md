@@ -1,3 +1,22 @@
+Credits & references:
+==============================================================================
+1. https://mirror.xyz/0x929fCf268A62e684221f1e39B8b6ddA2f0dA4AeC/ZhTQJ6qiurBTHBNuF08GudWBQ8x9p3P-12vo-C9czKE
+2. https://github.com/ArrakisFinance/minimize-lvr-hook-poc (implementation by: Arrakis Fi Team and @The-CTra1n)
+3. https://youtu.be/q5vyJJb-Uyw?si=tndrq71Uk6kQk2ie
+4. https://youtu.be/XmHBiFApDXA?si=R_w3VN1VlNjgz4N6
+5. https://youtu.be/ja3HPbkgaIY?si=i1LDxSEL043xbNeC
+6. https://ethresear.ch/t/lvr-minimization-in-uniswap-v4/15900
+7. https://fenbushi.vc/2024/01/20/ending-lps-losing-game-exploring-the-loss-versus-rebalancing-lvr-problem-and-its-solutions/
+
+hook calling curve: https://github.com/OpenZeppelin/uniswap-solidity-hooks-template; https://github.com/OpenZeppelin/uniswap-solidity-hooks-template/blob/main/src/Counter.sol
+forge test is calling a mock curve contract
+
+curve template: https://github.com/OpenZeppelin/uniswap-stylus-curve-template/blob/main/src/lib.rs
+sdk:https://docs.arbitrum.io/stylus/reference/overview
+by example:https://stylus-by-example.org/
+debug errors: https://github.com/OffchainLabs/cargo-stylus/blob/main/main/VALID_WASM.md
+
+
 Common dev commands
 ===================
 ```
@@ -23,28 +42,4 @@ cast send --rpc-url 'http://localhost:8547' --private-key 0xb6b15c8cb491557369f3
 ```
 
 test node prefunded account: 
-1. 0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659
-2. ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-pre-funded dev account: 0x3f1eae7d46d88f08fc2f8ed27fcb2ab183eb2d0e
-
-hook calling curve: https://github.com/OpenZeppelin/uniswap-solidity-hooks-template; https://github.com/OpenZeppelin/uniswap-solidity-hooks-template/blob/main/src/Counter.sol
-forge test is calling a mock curve contract
-
-curve template: https://github.com/OpenZeppelin/uniswap-stylus-curve-template/blob/main/src/lib.rs
-sdk:https://docs.arbitrum.io/stylus/reference/overview
-by example:https://stylus-by-example.org/
-debug errors: https://github.com/OffchainLabs/cargo-stylus/blob/main/main/VALID_WASM.md
-
-
-ref:
-https://ethresear.ch/t/lvr-minimization-in-uniswap-v4/15900
-https://fenbushi.vc/2024/01/20/ending-lps-losing-game-exploring-the-loss-versus-rebalancing-lvr-problem-and-its-solutions/
-https://github.com/ArrakisFinance/minimize-lvr-hook-poc
-
-
-Extensions / What's different
-==============================================================================
-1. code updated to use more recent uniswap libs. code that is mainly using uniswap lib remains in foundry project
-2. shifted some compute to stylus
-3. black scholes model in stylus for analytics of loss etc
-4. more detailed explaination of code and logic for purpose of learning and sharing
+0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659
